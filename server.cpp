@@ -64,6 +64,7 @@ void *connectListenner(void *socketDescription){
     
     int socket = *(int*)socketDescription;
     char clientResponse[2000]; 
+    char * buffer;
     string message;
     int buffer_size; 
     char * tokens;
@@ -77,6 +78,7 @@ void *connectListenner(void *socketDescription){
     string extension;
     string serverText = "Server: localhost:8080 \r\n";
     string closeText = "COnnection: close\r\n";
+    string line;
     //Enviar mensajes
 
 
@@ -110,24 +112,32 @@ void *connectListenner(void *socketDescription){
                 
               
                 htmlFile.seekg( 0, ios::end );
+                int b_size = htmlFile.tellg();
                 head = status+closeText+dateT+serverText;
                 stringstream ss; 
                 ss << "Content-Length: " << htmlFile.tellg() << "\r\n";
                 length = ss.str();
                 head += length + type;
-                cout << head << endl;
-                send(socket, head.c_str(),head.length(),0);
+                write(socket, head.c_str(),head.length());
+                htmlFile.seekg(0,ios::beg);
+                buffer = new char[b_size];
+                htmlFile.read(buffer,b_size);
+                
+                send(socket,buffer,b_size,0);
+            
                 htmlFile.close();
             }else{
                 if(strcmp(tokens,"HTTP/1.1")){
                     status = "HTTP/1.1 404 not found\r\n";
+
                 }else{
                     status = "HTTP/1.0 404 not found\r\n";
                 }
+               write(socket,status.c_str(),status.length());
             }
 
   
-            cout << tokens << 1 << endl;
+            
            
 
         }else{
