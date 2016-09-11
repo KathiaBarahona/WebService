@@ -77,7 +77,7 @@ void *connectListenner(void *socketDescription){
     string length;
     string extension;
     string serverText = "Server: localhost:8080 \r\n";
-    string closeText = "COnnection: close\r\n";
+    string closeText = "Connection: close\r\n";
     string line;
     //Enviar mensajes
 
@@ -85,31 +85,31 @@ void *connectListenner(void *socketDescription){
     while((buffer_size = recv(socket, clientResponse, 2000, 0)) > 0){
         
         tokens = strtok(clientResponse," ");
+
         if(strcmp(tokens,"GET") == 0){
             
             tokens = strtok(NULL, " ");
             fileRoute = tokens;
             fileRoute = fileRoute.substr(1);
-            ifstream htmlFile (fileRoute.c_str(),ios::binary );
+            time_t now = time(0);
 
+            tm *ltm = localtime(&now);
+            stringstream time;
+            time << 1900 + ltm->tm_year << "-" << 1 + ltm->tm_mon << "-" << ltm->tm_mday;
+            time << " " << 1 + ltm->tm_hour <<":"<<1 + ltm->tm_min<<":"<< 1 + ltm->tm_sec;
+            dateT = "Date: "+time.str()+"\r\n";
+            extension = getFileExt(fileRoute);
+            type = getContentType(extension.c_str());
+            ifstream htmlFile (fileRoute.c_str(),ios::binary );
+           
             tokens = strtok(NULL, " ");
             if (htmlFile.is_open()){
-                if(strcmp(tokens,"HTTP/1.1")){
+                if(strcmp(tokens,"HTTP/1.1") == 0){
                     status = "HTTP/1.1 200 OK\r\n";
                 }else{
                     status = "HTTP/1.0 200 OK\r\n";
                 }
-                
-                time_t now = time(0);
-
-                tm *ltm = localtime(&now);
-                stringstream time;
-                time << 1900 + ltm->tm_year << "-" << 1 + ltm->tm_mon << "-" << ltm->tm_mday;
-                time << " " << 1 + ltm->tm_hour <<":"<<1 + ltm->tm_min<<":"<< 1 + ltm->tm_sec;
-                dateT = "Date: "+time.str()+"\r\n";
-                extension = getFileExt(fileRoute);
-                type = getContentType(extension.c_str());
-                
+                    
               
                 htmlFile.seekg( 0, ios::end );
                 int b_size = htmlFile.tellg();
@@ -122,18 +122,25 @@ void *connectListenner(void *socketDescription){
                 htmlFile.seekg(0,ios::beg);
                 buffer = new char[b_size];
                 htmlFile.read(buffer,b_size);
-                
                 send(socket,buffer,b_size,0);
-            
                 htmlFile.close();
+                if(strcmp(tokens,"HTTP/1.0") == 0){
+                    
+                    close(*(int *)(socketDescription));
+                }
             }else{
-                if(strcmp(tokens,"HTTP/1.1")){
+                if(strcmp(tokens,"HTTP/1.1") == 0){
                     status = "HTTP/1.1 404 not found\r\n";
 
                 }else{
                     status = "HTTP/1.0 404 not found\r\n";
                 }
-               write(socket,status.c_str(),status.length());
+                head = status+closeText+dateT+serverText+"\r\nContent-Length: 0\r\n";
+                head += type;
+                
+               write(socket,head.c_str(),head.length());
+               send(socket,status.c_str(),status.length(),0);
+               close(*(int *)(socketDescription));
             }
 
   
@@ -141,24 +148,48 @@ void *connectListenner(void *socketDescription){
            
 
         }else{
-            if (tokens == "POST"){
-
-            }else{
-                if (tokens == "PUT"){
-
+            if (strcmp(tokens,"POST") == 0 || strcmp(tokens,"PUT") == 0 ){
+                tokens = strtok(NULL, " ");
+                tokens = strtok(NULL, " ");
+                if(strcmp(tokens,"HTTP/1.1") == 0){
+                    status = "HTTP/1.1 200 OK\r\n";
                 }else{
-                    cout << "Ha ocurrido un error" << endl;
-                } 
+                    status = "HTTP/1.0 200 OK\r\n";
+                }
+                string data;
+                while(tokens != NULL){
+                    
+                    tokens = strtok(NULL,"\r\n");
+                     
+                    if(tokens != NULL){
+                        data.assign(tokens,strlen(tokens));
+                    }
+                }
+              
+                time_t now = time(0);
+
+                tm *ltm = localtime(&now);
+                stringstream time;
+                time << 1900 + ltm->tm_year << "-" << 1 + ltm->tm_mon << "-" << ltm->tm_mday;
+                time << " " << 1 + ltm->tm_hour <<":"<<1 + ltm->tm_min<<":"<< 1 + ltm->tm_sec;
+                dateT = "Date: "+time.str()+"\r\n";
+                stringstream ss; 
+                ss << "Content-Length: " << data.length()<< "\r\n";
+                head = status+closeText+dateT+serverText+"\r\n"+ss.str()+"\r\n";
+
+                write(socket, head.c_str(),head.length());
+
+                send(socket,data.c_str(),data.length(),0);
+                if(strcmp(status.c_str(),"HTTP/1.0 200 OK\r\n") == 0){
+                    
+                    close(*(int *)(socketDescription));
+                }
             }
         }
             
     }
     if(buffer_size == 0){
         cout << "Cliente desconectado ..." << endl;
-    }else{
-        if(buffer_size == -1){
-            cout << "Ha ocurrido un error" << endl;
-        }
     }
     //Free the socket pointer
     free(socketDescription);
@@ -166,21 +197,33 @@ void *connectListenner(void *socketDescription){
     return 0;
 }
 string getContentType( const char* extension){
-    if(strcmp(extension,"html") || strcmp(extension,"txt") ){
+    if(strcmp(extension,"html") == 0 || strcmp(extension,"txt") == 0 ){
         return "Content-Type: text/html\r\n\r\n";
     }
-    if(strcmp(extension,"css")){
+    if(strcmp(extension,"css") == 0){
         return "Content-Type: text/css\r\n\r\n";
     }
-    if(strcmp(extension,"jpeg") || strcmp(extension,"jpg")){
+    if(strcmp(extension,"jpeg") == 0 || strcmp(extension,"jpg") == 0){
         return "Content-Type: image/jpeg\r\n\r\n";
     }
-    if(strcmp(extension,"gif")){
+    if(strcmp(extension,"gif") == 0){
         return "Content-Type: image/gif\r\n\r\n";
     }
-    if(strcmp(extension,"png")){
+    if(strcmp(extension,"png") == 0){
         return "Content-Type: image/png\r\n\r\n";
 
+    }
+    if(strcmp(extension,"js") == 0){
+        return "Content-Type: script\r\n\r\n";
+    }
+    if(strcmp(extension,"woff") == 0){
+        return "Content-Type: font-woff\r\n\r\n";
+    }
+    if(strcmp(extension,"ttf") == 0){
+        return "Content-Type: x-font-ttf\r\n\r\n";
+    }
+    if(strcmp(extension,"woff2") == 0){
+        return "Content-Type: text/plain\r\n\r\n";
     }
     return "Content-Type not found";
   

@@ -15,7 +15,7 @@ using namespace std;
 
 int socketDescription;
 struct sockaddr_in server;
-int port = 80;
+int port = 8080;
 
 int main(int argc, char const *argv[])
 {
